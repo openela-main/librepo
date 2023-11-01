@@ -1,0 +1,296 @@
+From 493226f298b3d81e4b01d9f2c64a1cc2eb3049e4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Luk=C3=A1=C5=A1=20Hr=C3=A1zk=C3=BD?= <lhrazky@redhat.com>
+Date: Fri, 15 Jul 2022 17:16:12 +0200
+Subject: [PATCH] Fix alloc / free mismatches from covscan
+
+---
+ librepo/checksum.c           |  6 +++---
+ librepo/downloader.c         |  2 +-
+ librepo/lrmirrorlist.c       |  2 +-
+ librepo/package_downloader.c |  2 +-
+ librepo/repoconf.c           |  2 +-
+ librepo/repoutil_yum.c       |  4 ++--
+ librepo/util.c               |  6 +++---
+ tests/test_checksum.c        |  4 ++--
+ tests/test_gpg.c             |  2 +-
+ tests/test_main.c            |  2 +-
+ tests/test_util.c            | 24 ++++++++++++------------
+ 11 files changed, 28 insertions(+), 28 deletions(-)
+
+diff --git a/librepo/checksum.c b/librepo/checksum.c
+index d82cb5c..4831ddc 100644
+--- a/librepo/checksum.c
++++ b/librepo/checksum.c
+@@ -205,8 +205,6 @@ lr_checksum_fd_compare(LrChecksumType type,
+                        gchar **calculated,
+                        GError **err)
+ {
+-    _cleanup_free_ gchar *checksum = NULL;
+-
+     assert(fd >= 0);
+     assert(!err || *err == NULL);
+ 
+@@ -262,7 +260,7 @@ lr_checksum_fd_compare(LrChecksumType type,
+         }
+     }
+ 
+-    checksum = lr_checksum_fd(type, fd, err);
++    char *checksum = lr_checksum_fd(type, fd, err);
+     if (!checksum)
+         return FALSE;
+ 
+@@ -274,6 +272,7 @@ lr_checksum_fd_compare(LrChecksumType type,
+         } else {
+             g_set_error(err, LR_CHECKSUM_ERROR, LRE_FILE,
+                         "fsync failed: %s", strerror(errno));
++            lr_free(checksum);
+             return FALSE;
+         }
+     }
+@@ -287,6 +286,7 @@ lr_checksum_fd_compare(LrChecksumType type,
+     if (calculated)
+         *calculated = g_strdup(checksum);
+ 
++    lr_free(checksum);
+     return TRUE;
+ }
+ 
+diff --git a/librepo/downloader.c b/librepo/downloader.c
+index f4e8ba2..84739a9 100644
+--- a/librepo/downloader.c
++++ b/librepo/downloader.c
+@@ -1974,7 +1974,7 @@ list_of_checksums_to_str(GSList *checksums)
+         tmp = g_strconcat(expected, chksum->value, "(",
+                           chtype_str ? chtype_str : "UNKNOWN",
+                           ") ", NULL);
+-        free(expected);
++        g_free(expected);
+         expected = tmp;
+     }
+ 
+diff --git a/librepo/lrmirrorlist.c b/librepo/lrmirrorlist.c
+index c7e51b3..91cdc4b 100644
+--- a/librepo/lrmirrorlist.c
++++ b/librepo/lrmirrorlist.c
+@@ -156,7 +156,7 @@ lr_lrmirrorlist_append_metalink(LrInternalMirrorlist *list,
+         LrInternalMirror *mirror = lr_lrmirror_new(url_copy, urlvars);
+         mirror->preference = metalinkurl->preference;
+         mirror->protocol = lr_detect_protocol(mirror->url);
+-        lr_free(url_copy);
++        g_free(url_copy);
+         list = g_slist_append(list, mirror);
+ 
+         //g_debug("%s: Appending URL: %s", __func__, mirror->url);
+diff --git a/librepo/package_downloader.c b/librepo/package_downloader.c
+index adea459..353cac8 100644
+--- a/librepo/package_downloader.c
++++ b/librepo/package_downloader.c
+@@ -173,7 +173,7 @@ lr_packagetarget_free(LrPackageTarget *target)
+     if (!target)
+         return;
+     g_string_chunk_free(target->chunk);
+-    g_free(target);
++    lr_free(target);
+ }
+ 
+ gboolean
+diff --git a/librepo/repoconf.c b/librepo/repoconf.c
+index 948259e..34dbab4 100644
+--- a/librepo/repoconf.c
++++ b/librepo/repoconf.c
+@@ -146,7 +146,7 @@ lr_yum_repoconfs_free(LrYumRepoConfs *repos)
+         return;
+     g_slist_free_full(repos->repos, (GDestroyNotify) lr_yum_repoconf_free);
+     g_slist_free_full(repos->files, (GDestroyNotify) lr_yum_repofile_free);
+-    g_free(repos);
++    lr_free(repos);
+ }
+ 
+ GSList *
+diff --git a/librepo/repoutil_yum.c b/librepo/repoutil_yum.c
+index 02e796f..bb09ff5 100644
+--- a/librepo/repoutil_yum.c
++++ b/librepo/repoutil_yum.c
+@@ -105,11 +105,11 @@ lr_repoutil_yum_parse_repomd(const char *in_path,
+     if (fd < 0) {
+         g_set_error(err, LR_REPOUTIL_YUM_ERROR, LRE_IO,
+                     "open(%s, O_RDONLY) error: %s", path, g_strerror(errno));
+-        lr_free(path);
++        g_free(path);
+         return FALSE;
+     }
+ 
+-    lr_free(path);
++    g_free(path);
+ 
+     ret = lr_yum_repomd_parse_file(repomd, fd, NULL, NULL, err);
+     close(fd);
+diff --git a/librepo/util.c b/librepo/util.c
+index 8ba7120..204572d 100644
+--- a/librepo/util.c
++++ b/librepo/util.c
+@@ -170,7 +170,7 @@ lr_gettmpdir(void)
+ {
+     char *template = g_build_filename(g_get_tmp_dir(), "librepo-tmpdir-XXXXXX", NULL);
+     if (!mkdtemp(template)) {
+-        lr_free(template);
++        g_free(template);
+         return NULL;
+     }
+     return template;
+@@ -206,7 +206,7 @@ lr_pathconcat(const char *first, ...)
+ 
+     qmark_section = strchr(first, '?');
+ 
+-    res = lr_malloc(total_len + separator_len + 1);
++    res = g_malloc(total_len + separator_len + 1);
+ 
+     next = first;
+     va_start(args, first);
+@@ -273,7 +273,7 @@ lr_pathconcat(const char *first, ...)
+     assert(offset <= total_len);
+ 
+     if (offset == 0) {
+-        lr_free(res);
++        g_free(res);
+         return g_strdup(first);
+     }
+ 
+diff --git a/tests/test_checksum.c b/tests/test_checksum.c
+index 548f588..264782c 100644
+--- a/tests/test_checksum.c
++++ b/tests/test_checksum.c
+@@ -295,8 +295,8 @@ START_TEST(test_cached_checksum_clear)
+ cleanup:
+     close(fd);
+     lr_free(filename);
+-    lr_free(timestamp_key);
+-    lr_free(checksum_key);
++    g_free(timestamp_key);
++    g_free(checksum_key);
+ }
+ END_TEST
+ 
+diff --git a/tests/test_gpg.c b/tests/test_gpg.c
+index fd322e3..0af423a 100644
+--- a/tests/test_gpg.c
++++ b/tests/test_gpg.c
+@@ -110,7 +110,7 @@ START_TEST(test_gpg_check_signature)
+     lr_free(_data_path);
+     lr_free(signature_path);
+     lr_free(_signature_path);
+-    lr_free(tmp_home_path);
++    g_free(tmp_home_path);
+ }
+ END_TEST
+ 
+diff --git a/tests/test_main.c b/tests/test_main.c
+index 1076062..b323ce5 100644
+--- a/tests/test_main.c
++++ b/tests/test_main.c
+@@ -39,7 +39,7 @@ init_test_globals(struct TestGlobals_s *tg, const char *testdata_dir)
+ static void
+ free_test_globals(struct TestGlobals_s *tg)
+ {
+-    lr_free(tg->tmpdir);
++    g_free(tg->tmpdir);
+     lr_free(tg->testdata_dir);
+ }
+ 
+diff --git a/tests/test_util.c b/tests/test_util.c
+index 595b0fe..d082445 100644
+--- a/tests/test_util.c
++++ b/tests/test_util.c
+@@ -54,7 +54,7 @@ START_TEST(test_gettmpdir)
+     char *tmp_dir = lr_gettmpdir();
+     ck_assert_ptr_nonnull(tmp_dir);
+     ck_assert_int_eq(rmdir(tmp_dir), 0);
+-    lr_free(tmp_dir);
++    g_free(tmp_dir);
+ }
+ END_TEST
+ 
+@@ -126,7 +126,7 @@ START_TEST(test_remove_dir)
+     ck_assert_int_eq(rc, 0);
+     ck_assert_int_ne(unlink(tmp_file), 0);
+     ck_assert_int_ne(rmdir(tmp_dir), 0);
+-    lr_free(tmp_dir);
++    g_free(tmp_dir);
+     lr_free(tmp_file);
+ }
+ END_TEST
+@@ -141,61 +141,61 @@ START_TEST(test_url_without_path)
+     new_url = lr_url_without_path("");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("hostname");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "hostname");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("hostname/foo/bar/");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "hostname");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("hostname:80");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "hostname:80");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("hostname:80/foo/bar");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "hostname:80");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("http://hostname:80/");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "http://hostname:80");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("http://hostname:80/foo/bar");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "http://hostname:80");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("ftp://foo.hostname:80/foo/bar");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "ftp://foo.hostname:80");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("file:///home/foobar");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "file://");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ 
+     new_url = lr_url_without_path("file:/home/foobar");
+     ck_assert_ptr_nonnull(new_url);
+     ck_assert_str_eq(new_url, "file://");
+-    lr_free(new_url);
++    g_free(new_url);
+     new_url = NULL;
+ }
+ END_TEST
+-- 
+2.37.1
+

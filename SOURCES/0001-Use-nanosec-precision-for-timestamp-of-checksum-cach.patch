@@ -1,0 +1,72 @@
+From e6f48ae9bff7b5dc8027d043aa1bffa53d507a42 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ale=C5=A1=20Mat=C4=9Bj?= <amatej@redhat.com>
+Date: Thu, 5 May 2022 12:44:27 +0200
+Subject: [PATCH] Use nanosec precision for timestamp of checksum cache
+ (RhBug:2077864)
+
+= changelog =
+msg: Use nanosec precision for timestamp of checksum cache
+type: bugfix
+resolves: https://bugzilla.redhat.com/show_bug.cgi?id=2077864
+---
+ librepo/checksum.c    | 7 +++++--
+ tests/test_checksum.c | 6 +++++-
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/librepo/checksum.c b/librepo/checksum.c
+index 6bba53c..d82cb5c 100644
+--- a/librepo/checksum.c
++++ b/librepo/checksum.c
+@@ -18,6 +18,7 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
++#define _POSIX_C_SOURCE 200809L
+ #include <glib.h>
+ #include <glib/gprintf.h>
+ #include <assert.h>
+@@ -217,16 +218,18 @@ lr_checksum_fd_compare(LrChecksumType type,
+         return FALSE;
+     }
+ 
+-    time_t timestamp = -1;
++    long long timestamp = -1;
+ 
+     if (caching) {
+         struct stat st;
+         if (fstat(fd, &st) == 0) {
+             timestamp = st.st_mtime;
++            timestamp *= 1000000000; //convert sec timestamp to nanosec timestamp
++            timestamp += st.st_mtim.tv_nsec;
+         }
+     }
+ 
+-    _cleanup_free_ gchar *timestamp_str = g_strdup_printf("%lli", (long long)timestamp);
++    _cleanup_free_ gchar *timestamp_str = g_strdup_printf("%lli", timestamp);
+     const char *type_str = lr_checksum_type_to_str(type);
+     _cleanup_free_ gchar *timestamp_key = g_strconcat(XATTR_CHKSUM_PREFIX, "mtime", NULL);
+     _cleanup_free_ gchar *checksum_key = g_strconcat(XATTR_CHKSUM_PREFIX, type_str, NULL);
+diff --git a/tests/test_checksum.c b/tests/test_checksum.c
+index cd28cd1..548f588 100644
+--- a/tests/test_checksum.c
++++ b/tests/test_checksum.c
+@@ -1,3 +1,4 @@
++#define _POSIX_C_SOURCE 200809L
+ #define _GNU_SOURCE
+ #include <errno.h>
+ #include <stdlib.h>
+@@ -150,7 +151,10 @@ START_TEST(test_cached_checksum_matches)
+     // stored timestamp matches the file mtime
+     ret = stat(filename, &st);
+     ck_assert_int_eq(ret, 0);
+-    mtime_str = g_strdup_printf("%lli", (long long) st.st_mtime);
++    long long timestamp = st.st_mtime;
++    timestamp *= 1000000000; //convert sec timestamp to nanosec timestamp
++    timestamp += st.st_mtim.tv_nsec;
++    mtime_str = g_strdup_printf("%lli", timestamp);
+     attr_ret = GETXATTR(filename, timestamp_key, &buf, sizeof(buf)-1);
+     ck_assert(attr_ret != -1);
+     buf[attr_ret] = 0;
+-- 
+2.36.1
+

@@ -1,0 +1,578 @@
+From 678803b825fea10e4915a300f0e2fc990b7c99fd Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Luk=C3=A1=C5=A1=20Hr=C3=A1zk=C3=BD?= <lhrazky@redhat.com>
+Date: Thu, 21 Jul 2022 10:11:17 +0200
+Subject: [PATCH] More covscan fixes
+
+---
+ librepo/metadata_downloader.c | 18 +++++++++---------
+ librepo/metalink.c            |  2 +-
+ librepo/repomd.c              |  2 +-
+ librepo/xmlparser.c           |  4 ++--
+ librepo/xmlparser_internal.h  |  2 +-
+ librepo/yum.c                 | 32 ++++++++++++++++----------------
+ tests/test_checksum.c         | 10 +++++-----
+ tests/test_downloader.c       | 16 ++++++++--------
+ tests/test_metalink.c         | 18 +++++++++---------
+ tests/test_mirrorlist.c       |  6 +++---
+ tests/test_util.c             | 16 ++++++++--------
+ 11 files changed, 63 insertions(+), 63 deletions(-)
+
+diff --git a/librepo/metadata_downloader.c b/librepo/metadata_downloader.c
+index be6fe68..9e7d7e5 100644
+--- a/librepo/metadata_downloader.c
++++ b/librepo/metadata_downloader.c
+@@ -192,7 +192,7 @@ handle_failure(LrMetadataTarget *target,
+                GSList **paths,
+                GError *err)
+ {
+-    lr_metadatatarget_append_error(target, err->message, NULL);
++    lr_metadatatarget_append_error(target, err->message);
+     fillInvalidationValues(fd_list, paths);
+     g_error_free(err);
+ }
+@@ -221,13 +221,13 @@ create_repomd_xml_download_targets(GSList *targets,
+         handle = target->handle;
+ 
+         if (!handle->urls && !handle->mirrorlisturl && !handle->metalinkurl) {
+-            lr_metadatatarget_append_error(target, "No LRO_URLS, LRO_MIRRORLISTURL nor LRO_METALINKURL specified", NULL);
++            lr_metadatatarget_append_error(target, "No LRO_URLS, LRO_MIRRORLISTURL nor LRO_METALINKURL specified");
+             fillInvalidationValues(fd_list, paths);
+             continue;
+         }
+ 
+         if (handle->repotype != LR_YUMREPO) {
+-            lr_metadatatarget_append_error(target, "Bad LRO_REPOTYPE specified", NULL);
++            lr_metadatatarget_append_error(target, "Bad LRO_REPOTYPE specified");
+             fillInvalidationValues(fd_list, paths);
+             continue;
+         }
+@@ -242,14 +242,14 @@ create_repomd_xml_download_targets(GSList *targets,
+         if (!lr_handle_prepare_internal_mirrorlist(handle,
+                                                    handle->fastestmirror,
+                                                    &err)) {
+-            lr_metadatatarget_append_error(target, "Cannot prepare internal mirrorlist: %s", err->message, NULL);
++            lr_metadatatarget_append_error(target, "Cannot prepare internal mirrorlist: %s", err->message);
+             fillInvalidationValues(fd_list, paths);
+             g_error_free(err);
+             continue;
+         }
+ 
+         if (mkdir(handle->destdir, S_IRWXU) == -1 && errno != EEXIST) {
+-            lr_metadatatarget_append_error(target, "Cannot create tmpdir: %s %s", handle->destdir, g_strerror(errno), NULL);
++            lr_metadatatarget_append_error(target, "Cannot create tmpdir: %s %s", handle->destdir, g_strerror(errno));
+             fillInvalidationValues(fd_list, paths);
+             g_error_free(err);
+             continue;
+@@ -335,12 +335,12 @@ process_repomd_xml(GSList *targets,
+         handle->gnupghomedir = g_strdup(target->gnupghomedir);
+ 
+         if (target->download_target->rcode != LRE_OK) {
+-            lr_metadatatarget_append_error(target, (char *) lr_strerror(target->download_target->rcode), NULL);
++            lr_metadatatarget_append_error(target, (char *) lr_strerror(target->download_target->rcode));
+             goto fail;
+         }
+ 
+         if (!lr_check_repomd_xml_asc_availability(handle, target->repo, fd_value, path->data, &error)) {
+-            lr_metadatatarget_append_error(target, error->message, NULL);
++            lr_metadatatarget_append_error(target, error->message);
+             g_error_free(error);
+             goto fail;
+         }
+@@ -349,7 +349,7 @@ process_repomd_xml(GSList *targets,
+         ret = lr_yum_repomd_parse_file(target->repomd, fd_value, lr_xml_parser_warning_logger,
+                                        "Repomd xml parser", &error);
+         if (!ret) {
+-            lr_metadatatarget_append_error(target, "Parsing unsuccessful: %s", error->message, NULL);
++            lr_metadatatarget_append_error(target, "Parsing unsuccessful: %s", error->message);
+             g_error_free(error);
+             goto fail;
+         }
+@@ -377,7 +377,7 @@ lr_metadata_download_cleanup(GSList *download_targets)
+         LrDownloadTarget *download_target = elem->data;
+         LrMetadataTarget *target = download_target->userdata;
+         if (download_target->err)
+-            lr_metadatatarget_append_error(target, download_target->err, NULL);
++            lr_metadatatarget_append_error(target, download_target->err);
+ 
+         if (target->err != NULL) {
+             ret = FALSE;
+diff --git a/librepo/metalink.c b/librepo/metalink.c
+index 0f939de..1f839a9 100644
+--- a/librepo/metalink.c
++++ b/librepo/metalink.c
+@@ -504,7 +504,7 @@ lr_metalink_parse_file(LrMetalink *metalink,
+ 
+     // Parsing
+ 
+-    ret = lr_xml_parser_generic(parser, pd, fd, &tmp_err);
++    ret = lr_xml_parser_generic(&parser, pd, fd, &tmp_err);
+     if (tmp_err) {
+         g_propagate_error(err, tmp_err);
+         goto err;
+diff --git a/librepo/repomd.c b/librepo/repomd.c
+index f0fd2ad..2905749 100644
+--- a/librepo/repomd.c
++++ b/librepo/repomd.c
+@@ -570,7 +570,7 @@ lr_yum_repomd_parse_file(LrYumRepoMd *repomd,
+ 
+     // Parsing
+ 
+-    ret = lr_xml_parser_generic(parser, pd, fd, &tmp_err);
++    ret = lr_xml_parser_generic(&parser, pd, fd, &tmp_err);
+     if (tmp_err)
+         g_propagate_error(err, tmp_err);
+ 
+diff --git a/librepo/xmlparser.c b/librepo/xmlparser.c
+index 793c272..88d16aa 100644
+--- a/librepo/xmlparser.c
++++ b/librepo/xmlparser.c
+@@ -143,7 +143,7 @@ lr_xml_parser_strtoll(LrParserData *pd,
+ }
+ 
+ gboolean
+-lr_xml_parser_generic(XmlParser parser,
++lr_xml_parser_generic(XmlParser *parser,
+                       LrParserData *pd,
+                       int fd,
+                       GError **err)
+@@ -151,7 +151,7 @@ lr_xml_parser_generic(XmlParser parser,
+     /* Note: This function uses .err members of LrParserData! */
+ 
+     gboolean ret = TRUE;
+-    xmlParserCtxtPtr ctxt = xmlCreatePushParserCtxt(&parser, pd, NULL, 0, NULL);
++    xmlParserCtxtPtr ctxt = xmlCreatePushParserCtxt(parser, pd, NULL, 0, NULL);
+     ctxt->linenumbers = 1;
+ 
+     assert(ctxt);
+diff --git a/librepo/xmlparser_internal.h b/librepo/xmlparser_internal.h
+index c9bacac..25a48a5 100644
+--- a/librepo/xmlparser_internal.h
++++ b/librepo/xmlparser_internal.h
+@@ -159,7 +159,7 @@ lr_xml_parser_strtoll(LrParserData *pd,
+ /** Generic parser.
+  */
+ gboolean
+-lr_xml_parser_generic(XmlParser parser,
++lr_xml_parser_generic(XmlParser *parser,
+                       LrParserData *pd,
+                       int fd,
+                       GError **err);
+diff --git a/librepo/yum.c b/librepo/yum.c
+index 3b287cd..56bca3e 100644
+--- a/librepo/yum.c
++++ b/librepo/yum.c
+@@ -335,7 +335,7 @@ lr_prepare_repodata_dir(LrHandle *handle,
+             return FALSE;
+         }
+     }
+-    lr_free(path_to_repodata);
++    g_free(path_to_repodata);
+ 
+     return TRUE;
+ }
+@@ -356,7 +356,7 @@ lr_store_mirrorlist_files(LrHandle *handle,
+             g_debug("%s: Cannot create: %s", __func__, ml_file_path);
+             g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                         "Cannot create %s: %s", ml_file_path, g_strerror(errno));
+-            lr_free(ml_file_path);
++            g_free(ml_file_path);
+             return FALSE;
+         }
+         rc = lr_copy_content(handle->mirrorlist_fd, fd);
+@@ -366,7 +366,7 @@ lr_store_mirrorlist_files(LrHandle *handle,
+             g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                         "Cannot copy content of mirrorlist file %s: %s",
+                         ml_file_path, g_strerror(errno));
+-            lr_free(ml_file_path);
++            g_free(ml_file_path);
+             return FALSE;
+         }
+         repo->mirrorlist = ml_file_path;
+@@ -391,7 +391,7 @@ lr_copy_metalink_content(LrHandle *handle,
+             g_debug("%s: Cannot create: %s", __func__, ml_file_path);
+             g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                         "Cannot create %s: %s", ml_file_path, g_strerror(errno));
+-            lr_free(ml_file_path);
++            g_free(ml_file_path);
+             return FALSE;
+         }
+         rc = lr_copy_content(handle->metalink_fd, fd);
+@@ -401,7 +401,7 @@ lr_copy_metalink_content(LrHandle *handle,
+             g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                         "Cannot copy content of metalink file %s: %s",
+                         ml_file_path, g_strerror(errno));
+-            lr_free(ml_file_path);
++            g_free(ml_file_path);
+             return FALSE;
+         }
+         repo->metalink = ml_file_path;
+@@ -422,7 +422,7 @@ lr_prepare_repomd_xml_file(LrHandle *handle,
+     if (fd == -1) {
+         g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                     "Cannot open %s: %s", *path, g_strerror(errno));
+-        lr_free(*path);
++        g_free(*path);
+         return -1;
+     }
+ 
+@@ -458,13 +458,13 @@ lr_check_repomd_xml_asc_availability(LrHandle *handle,
+             g_debug("%s: Cannot open: %s", __func__, signature);
+             g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                         "Cannot open %s: %s", signature, g_strerror(errno));
+-            lr_free(signature);
++            g_free(signature);
+             return FALSE;
+         }
+ 
+         url = lr_pathconcat(handle->used_mirror, "repodata/repomd.xml.asc", NULL);
+         ret = lr_download_url(handle, url, fd_sig, &tmp_err);
+-        lr_free(url);
++        g_free(url);
+         close(fd_sig);
+         if (!ret) {
+             // Error downloading signature
+@@ -474,7 +474,7 @@ lr_check_repomd_xml_asc_availability(LrHandle *handle,
+                         "repository does not support GPG verification: %s", tmp_err->message);
+             g_clear_error(&tmp_err);
+             unlink(signature);
+-            lr_free(signature);
++            g_free(signature);
+             return FALSE;
+         } else {
+             // Signature downloaded
+@@ -483,7 +483,7 @@ lr_check_repomd_xml_asc_availability(LrHandle *handle,
+                                          path,
+                                          handle->gnupghomedir,
+                                          &tmp_err);
+-            lr_free(signature);
++            g_free(signature);
+             if (!ret) {
+                 g_debug("%s: GPG signature verification failed: %s",
+                         __func__, tmp_err->message);
+@@ -680,7 +680,7 @@ prepare_repo_download_std_target(LrHandle *handle,
+                 __func__, *path, g_strerror(errno));
+         g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                     "Cannot create/open %s: %s", *path, g_strerror(errno));
+-        lr_free(*path);
++        g_free(*path);
+         g_slist_free_full(*targets, (GDestroyNotify) lr_downloadtarget_free);
+         return FALSE;
+     }
+@@ -713,7 +713,7 @@ prepare_repo_download_zck_target(LrHandle *handle,
+                 __func__, *path, g_strerror(errno));
+         g_set_error(err, LR_YUM_ERROR, LRE_IO,
+                     "Cannot create/open %s: %s", *path, g_strerror(errno));
+-        lr_free(*path);
++        g_free(*path);
+         g_slist_free_full(*targets, (GDestroyNotify) lr_downloadtarget_free);
+         return FALSE;
+     }
+@@ -778,7 +778,7 @@ prepare_repo_download_targets(LrHandle *handle,
+         char *dest_dir = realpath(handle->destdir, NULL);
+         path = lr_pathconcat(handle->destdir, record->location_href, NULL);
+         char *requested_dir = realpath(dirname(path), NULL);
+-        lr_free(path);
++        g_free(path);
+         if (!g_str_has_prefix(requested_dir, dest_dir)) {
+             g_debug("%s: Invalid path: %s", __func__, location_href);
+             g_set_error(err, LR_YUM_ERROR, LRE_IO, "Invalid path: %s", location_href);
+@@ -850,7 +850,7 @@ prepare_repo_download_targets(LrHandle *handle,
+ 
+         /* Because path may already exists in repo (while update) */
+         lr_yum_repo_update(repo, record->type, path);
+-        lr_free(path);
++        g_free(path);
+     }
+ 
+     return TRUE;
+@@ -1130,7 +1130,7 @@ lr_yum_use_local_load_base(LrHandle *handle,
+             repo->mirrorlist = mrl_fn;
+         } else {
+             repo->mirrorlist = NULL;
+-            lr_free(mrl_fn);
++            g_free(mrl_fn);
+         }
+     }
+ 
+@@ -1142,7 +1142,7 @@ lr_yum_use_local_load_base(LrHandle *handle,
+             repo->metalink = mtl_fn;
+         } else {
+             repo->metalink = NULL;
+-            lr_free(mtl_fn);
++            g_free(mtl_fn);
+         }
+     }
+ 
+diff --git a/tests/test_checksum.c b/tests/test_checksum.c
+index 264782c..efac88b 100644
+--- a/tests/test_checksum.c
++++ b/tests/test_checksum.c
+@@ -87,7 +87,7 @@ START_TEST(test_checksum_fd)
+     test_checksum(file, LR_CHECKSUM_SHA512, CHKS_VAL_01_SHA512);
+ 
+     ck_assert_msg(remove(file) == 0, "Cannot delete temporary test file");
+-    lr_free(file);
++    g_free(file);
+ }
+ END_TEST
+ 
+@@ -235,9 +235,9 @@ START_TEST(test_cached_checksum_value)
+     ck_assert(attr_ret == -1);  // Cached checksum should not exists
+ 
+     lr_free(calculated);
+-    lr_free(filename);
+-    lr_free(timestamp_key);
+-    lr_free(checksum_key);
++    g_free(filename);
++    g_free(timestamp_key);
++    g_free(checksum_key);
+     lr_free(mtime_str);
+ }
+ END_TEST
+@@ -294,7 +294,7 @@ START_TEST(test_cached_checksum_clear)
+     ck_assert(attr_ret != -1);
+ cleanup:
+     close(fd);
+-    lr_free(filename);
++    g_free(filename);
+     g_free(timestamp_key);
+     g_free(checksum_key);
+ }
+diff --git a/tests/test_downloader.c b/tests/test_downloader.c
+index 34958ab..a3fff20 100644
+--- a/tests/test_downloader.c
++++ b/tests/test_downloader.c
+@@ -52,7 +52,7 @@ START_TEST(test_downloader_single_file)
+     tmpfn1 = lr_pathconcat(test_globals.tmpdir, "single_file_XXXXXX", NULL);
+ 
+     fd1 = mkstemp(tmpfn1);
+-    lr_free(tmpfn1);
++    g_free(tmpfn1);
+     ck_assert_int_ge(fd1, 0);
+ 
+     t1 = lr_downloadtarget_new(handle, "index.html", NULL, fd1, NULL, NULL,
+@@ -97,7 +97,7 @@ START_TEST(test_downloader_single_file_2)
+     tmpfn1 = lr_pathconcat(test_globals.tmpdir, "single_file_2_XXXXXX", NULL);
+ 
+     fd1 = mkstemp(tmpfn1);
+-    lr_free(tmpfn1);
++    g_free(tmpfn1);
+     ck_assert_int_ge(fd1, 0);
+ 
+     t1 = lr_downloadtarget_new(NULL, "http://seznam.cz/index.html", NULL,
+@@ -154,8 +154,8 @@ START_TEST(test_downloader_two_files)
+ 
+     fd1 = mkstemp(tmpfn1);
+     fd2 = mkstemp(tmpfn2);
+-    lr_free(tmpfn1);
+-    lr_free(tmpfn2);
++    g_free(tmpfn1);
++    g_free(tmpfn2);
+     ck_assert_int_ge(fd1, 0);
+     ck_assert_int_ge(fd2, 0);
+ 
+@@ -223,9 +223,9 @@ START_TEST(test_downloader_three_files_with_error)
+     fd1 = mkstemp(tmpfn1);
+     fd2 = mkstemp(tmpfn2);
+     fd3 = mkstemp(tmpfn3);
+-    lr_free(tmpfn1);
+-    lr_free(tmpfn2);
+-    lr_free(tmpfn3);
++    g_free(tmpfn1);
++    g_free(tmpfn2);
++    g_free(tmpfn3);
+     ck_assert_int_ge(fd1, 0);
+     ck_assert_int_ge(fd2, 0);
+     ck_assert_int_ge(fd3, 0);
+@@ -329,7 +329,7 @@ START_TEST(test_downloader_checksum)
+         tmpfn1 = lr_pathconcat(test_globals.tmpdir, "single_file_XXXXXX", NULL);
+ 
+         fd1 = mkstemp(tmpfn1);
+-        lr_free(tmpfn1);
++        g_free(tmpfn1);
+         ck_assert_int_ge(fd1, 0);
+ 
+         checksum = lr_downloadtargetchecksum_new(LR_CHECKSUM_SHA512,
+diff --git a/tests/test_metalink.c b/tests/test_metalink.c
+index e425742..1440125 100644
+--- a/tests/test_metalink.c
++++ b/tests/test_metalink.c
+@@ -48,7 +48,7 @@ START_TEST(test_metalink_good_01)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_good_01", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -160,7 +160,7 @@ START_TEST(test_metalink_good_02)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_good_02", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -206,7 +206,7 @@ START_TEST(test_metalink_good_03)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_good_03", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -250,7 +250,7 @@ START_TEST(test_metalink_bad_01)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_bad_01", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -371,7 +371,7 @@ START_TEST(test_metalink_bad_02)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_bad_02", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -395,7 +395,7 @@ START_TEST(test_metalink_really_bad_01)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_really_bad_01", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -419,7 +419,7 @@ START_TEST(test_metalink_really_bad_02)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_really_bad_02", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -443,7 +443,7 @@ START_TEST(test_metalink_really_bad_03)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_really_bad_03", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -470,7 +470,7 @@ START_TEST(test_metalink_with_alternates)
+     path = lr_pathconcat(test_globals.testdata_dir, METALINK_DIR,
+                          "metalink_with_alternates", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_metalink_init();
+     ck_assert_ptr_nonnull(ml);
+diff --git a/tests/test_mirrorlist.c b/tests/test_mirrorlist.c
+index cc00b7f..ec924b6 100644
+--- a/tests/test_mirrorlist.c
++++ b/tests/test_mirrorlist.c
+@@ -35,7 +35,7 @@ START_TEST(test_mirrorlist_01)
+     path = lr_pathconcat(test_globals.testdata_dir, MIRRORLIST_DIR,
+                          "mirrorlist_01", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_mirrorlist_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -68,7 +68,7 @@ START_TEST(test_mirrorlist_02)
+     path = lr_pathconcat(test_globals.testdata_dir, MIRRORLIST_DIR,
+                          "mirrorlist_02", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_mirrorlist_init();
+     ck_assert_ptr_nonnull(ml);
+@@ -92,7 +92,7 @@ START_TEST(test_mirrorlist_03)
+     path = lr_pathconcat(test_globals.testdata_dir, MIRRORLIST_DIR,
+                          "mirrorlist_03", NULL);
+     fd = open(path, O_RDONLY);
+-    lr_free(path);
++    g_free(path);
+     ck_assert_int_ge(fd, 0);
+     ml = lr_mirrorlist_init();
+     ck_assert_ptr_nonnull(ml);
+diff --git a/tests/test_util.c b/tests/test_util.c
+index d082445..96e82aa 100644
+--- a/tests/test_util.c
++++ b/tests/test_util.c
+@@ -68,43 +68,43 @@ START_TEST(test_pathconcat)
+     path = lr_pathconcat("", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("/tmp", "foo///", "bar", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "/tmp/foo/bar");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("foo", "bar/", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "foo/bar");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("foo", "/bar/", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "foo/bar");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("foo", "bar", "", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "foo/bar/");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("http://host.net", "path/to/somewhere", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "http://host.net/path/to/somewhere");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ 
+     path = lr_pathconcat("http://host.net?hello=1", "path/to/", "somewhere", NULL);
+     ck_assert_ptr_nonnull(path);
+     ck_assert_str_eq(path, "http://host.net/path/to/somewhere?hello=1");
+-    lr_free(path);
++    g_free(path);
+     path = NULL;
+ }
+ END_TEST
+@@ -127,7 +127,7 @@ START_TEST(test_remove_dir)
+     ck_assert_int_ne(unlink(tmp_file), 0);
+     ck_assert_int_ne(rmdir(tmp_dir), 0);
+     g_free(tmp_dir);
+-    lr_free(tmp_file);
++    g_free(tmp_file);
+ }
+ END_TEST
+ 
+-- 
+2.37.1
+

@@ -1,0 +1,55 @@
+From a5305e7f957666c92040fa0134d69d9fbeb5db70 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Luk=C3=A1=C5=A1=20Hr=C3=A1zk=C3=BD?= <lhrazky@redhat.com>
+Date: Tue, 16 Aug 2022 15:41:44 +0200
+Subject: [PATCH] Use g_list_free_full() to free LRMetadataTarget::err
+
+Fixes a memory leak where the char * items in the list were not freed.
+---
+ CMakeLists.txt                | 2 +-
+ librepo.spec                  | 2 +-
+ librepo/metadata_downloader.c | 3 +--
+ 3 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a45d5c4..b4007e3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,7 +28,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+ # Find necessare libraries
+ 
+ FIND_PACKAGE(PkgConfig)
+-PKG_CHECK_MODULES(GLIB2 glib-2.0 REQUIRED)
++PKG_CHECK_MODULES(GLIB2 glib-2.0>=2.28 REQUIRED)
+ PKG_SEARCH_MODULE(LIBCRYPTO REQUIRED libcrypto openssl)
+ PKG_CHECK_MODULES(LIBXML2 libxml-2.0 REQUIRED)
+ FIND_PACKAGE(CURL 7.52.0 REQUIRED)
+diff --git a/librepo.spec b/librepo.spec
+index 5a733b2..88d6d6d 100644
+--- a/librepo.spec
++++ b/librepo.spec
+@@ -23,7 +23,7 @@ BuildRequires:  cmake
+ BuildRequires:  gcc
+ BuildRequires:  check-devel
+ BuildRequires:  doxygen
+-BuildRequires:  pkgconfig(glib-2.0)
++BuildRequires:  pkgconfig(glib-2.0) >= 2.28
+ BuildRequires:  gpgme-devel
+ BuildRequires:  libattr-devel
+ BuildRequires:  libcurl-devel >= %{libcurl_version}
+diff --git a/librepo/metadata_downloader.c b/librepo/metadata_downloader.c
+index 92a462b..cda1e40 100644
+--- a/librepo/metadata_downloader.c
++++ b/librepo/metadata_downloader.c
+@@ -89,8 +89,7 @@ lr_metadatatarget_free(LrMetadataTarget *target)
+     if (!target)
+         return;
+     g_string_chunk_free(target->chunk);
+-    if (target->err != NULL)
+-        g_list_free(target->err);
++    g_list_free_full(target->err, g_free);
+     g_free(target);
+ }
+ 
+-- 
+2.37.1
+

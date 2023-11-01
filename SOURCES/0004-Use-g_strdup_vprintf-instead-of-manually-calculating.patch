@@ -1,0 +1,51 @@
+From dc640e127f4c678c9dfbda776994972600d53e56 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Luk=C3=A1=C5=A1=20Hr=C3=A1zk=C3=BD?= <lhrazky@redhat.com>
+Date: Tue, 16 Aug 2022 13:44:22 +0200
+Subject: [PATCH] Use g_strdup_vprintf() instead of manually calculating
+ allocation space
+
+Fixes an error introduced in d2508e206514bdbf841ee72f4971336766c16fe1 by
+removing trailing NULLs, on which the size calculation code was relying.
+
+Instead of this incosistent argument iteration, use g_strdup_vprintf(),
+which allocates the new string correctly.
+---
+ librepo/metadata_downloader.c | 19 ++-----------------
+ 1 file changed, 2 insertions(+), 17 deletions(-)
+
+diff --git a/librepo/metadata_downloader.c b/librepo/metadata_downloader.c
+index 9e7d7e5..92a462b 100644
+--- a/librepo/metadata_downloader.c
++++ b/librepo/metadata_downloader.c
+@@ -98,26 +98,11 @@ void
+ lr_metadatatarget_append_error(LrMetadataTarget *target, char *format, ...)
+ {
+     va_list valist;
+-    size_t length = strlen(format);
+-    char *error_message = NULL;
+-
+-    va_start(valist, format);
+-    while (1) {
+-        char *arg = va_arg(valist, char*);
+-        if (arg == NULL)
+-            break;
+-
+-        length += strlen(arg);
+-    }
+-    length += RESERVE;
+-    va_end(valist);
+-
+     va_start(valist, format);
+-    error_message = malloc(length * sizeof(char));
+-    vsnprintf(error_message, length, format, valist);
++    gchar *error_message = g_strdup_vprintf(format, valist);
+     va_end(valist);
+ 
+-    target->err = g_list_append(target->err, (gpointer) error_message);
++    target->err = g_list_append(target->err, error_message);
+ }
+ 
+ static gboolean
+-- 
+2.37.1
+
