@@ -8,16 +8,20 @@
 %bcond_without zchunk
 %endif
 
+%bcond_without selinux
+
 %global dnf_conflict 2.8.8
 
 Name:           librepo
 Version:        1.14.5
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Repodata downloading library
 
 License:        LGPLv2+
 URL:            https://github.com/rpm-software-management/librepo
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
+
+Patch0001:      0001-PGP-Set-a-default-creation-SELinux-labels-on-GnuPG-d.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -29,6 +33,9 @@ BuildRequires:  libattr-devel
 BuildRequires:  libcurl-devel >= %{libcurl_version}
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(libcrypto)
+%if %{with selinux}
+BuildRequires:  pkgconfig(libselinux)
+%endif
 BuildRequires:  pkgconfig(openssl)
 %if %{with zchunk}
 BuildRequires:  pkgconfig(zck) >= 0.9.11
@@ -66,7 +73,9 @@ Python 3 bindings for the librepo library.
 %autosetup -p1
 
 %build
-%cmake %{!?with_zchunk:-DWITH_ZCHUNK=OFF}
+%cmake \
+    %{!?with_zchunk:-DWITH_ZCHUNK=OFF} \
+    -DENABLE_SELINUX=%{?with_selinux:ON}%{!?with_selinux:OFF}
 %cmake_build
 
 %check
@@ -96,6 +105,9 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Thu Oct 12 2023 Petr Pisar <ppisar@redhat.com> - 1.14.5-2
+- Set default SELinux labels on GnuPG directories (RHEL-11240)
+
 * Mon Jul 25 2022 Lukas Hrazky <lhrazky@redhat.com> - 1.14.5-1
 - Update to 1.14.5
 - Detailed error message when using non-existing TMPDIR (RhBug:2019993)
