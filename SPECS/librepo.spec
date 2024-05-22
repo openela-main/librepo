@@ -8,11 +8,13 @@
 %bcond_without zchunk
 %endif
 
+%bcond_without selinux
+
 %global dnf_conflict 2.8.8
 
 Name:           librepo
 Version:        1.14.2
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Repodata downloading library
 
 License:        LGPLv2+
@@ -25,6 +27,7 @@ Patch0003:      0003-More-covscan-fixes.patch
 Patch0004:      0004-Use-g_strdup_vprintf-instead-of-manually-calculating.patch
 Patch0005:      0005-Use-g_list_free_full-to-free-LRMetadataTarget-err.patch
 Patch0006:      0006-Detailed-error-message-when-using-non-existing-TMPDI.patch
+Patch0007:      0007-PGP-Set-a-default-creation-SELinux-labels-on-GnuPG-d.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -36,6 +39,9 @@ BuildRequires:  libattr-devel
 BuildRequires:  libcurl-devel >= %{libcurl_version}
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(libcrypto)
+%if %{with selinux}
+BuildRequires:  pkgconfig(libselinux)
+%endif
 BuildRequires:  pkgconfig(openssl)
 %if %{with zchunk}
 BuildRequires:  pkgconfig(zck) >= 0.9.11
@@ -73,7 +79,9 @@ Python 3 bindings for the librepo library.
 %autosetup -p1
 
 %build
-%cmake %{!?with_zchunk:-DWITH_ZCHUNK=OFF}
+%cmake \
+    %{!?with_zchunk:-DWITH_ZCHUNK=OFF} \
+    -DENABLE_SELINUX=%{?with_selinux:ON}%{!?with_selinux:OFF}
 %cmake_build
 
 %check
@@ -103,6 +111,9 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Thu Oct 12 2023 Petr Pisar <ppisar@redhat.com> - 1.14.2-5
+- Set default SELinux labels on GnuPG directories (RHEL-10720)
+
 * Mon Sep 12 2022 Lukas Hrazky <lhrazky@redhat.com> - 1.14.2-4
 - Fix termination of va_list in lr_metadatatarget_append_error()
 - Detailed error message when using non-existing TMPDIR
