@@ -1,0 +1,69 @@
+From 3c85711f35b987bd0ce17dd0fbaa0d9f2521c444 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Thu, 11 Jul 2024 15:40:03 +0200
+Subject: [PATCH] Fix a memory leak in select_next_target()
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+If a next target URL was found (non-NULL full_url) and then a transfer was
+canceled or an off-line mode was requested, full_url string was not freed and a
+memory leaked.
+
+Discovered with Covscan:
+
+    16. librepo-1.18.0/librepo/downloader.c:891:13: alloc_fn: Storage is returned from allocation function "g_strdup_inline".
+    17. librepo-1.18.0/librepo/downloader.c:891:13: var_assign: Assigning: "full_url" = storage returned from "g_strdup_inline(target->target->path)".
+    22. librepo-1.18.0/librepo/downloader.c:919:9: noescape: Resource "full_url" is not freed or pointed-to in "lr_is_local_path".
+    24. librepo-1.18.0/librepo/downloader.c:924:13: noescape: Assuming resource "full_url" is not freed or pointed-to as ellipsis argument to "g_debug".
+    28. librepo-1.18.0/librepo/downloader.c:956:17: leaked_storage: Variable "full_url" going out of scope leaks the storage it points to.
+    #   954|                               "and no local URL is available",
+    #   955|                               target->target->path);
+    #   956|->                 return FALSE;
+    #   957|               }
+    #   958|           }
+
+    16. librepo-1.18.0/librepo/downloader.c:891:13: alloc_fn: Storage is returned from allocation function "g_strdup_inline".
+    17. librepo-1.18.0/librepo/downloader.c:891:13: var_assign: Assigning: "full_url" = storage returned from "g_strdup_inline(target->target->path)".
+    22. librepo-1.18.0/librepo/downloader.c:919:9: noescape: Resource "full_url" is not freed or pointed-to in "lr_is_local_path".
+    24. librepo-1.18.0/librepo/downloader.c:924:13: noescape: Assuming resource "full_url" is not freed or pointed-to as ellipsis argument to "g_debug".
+    27. librepo-1.18.0/librepo/downloader.c:946:21: leaked_storage: Variable "full_url" going out of scope leaks the storage it points to.
+    #   944|                       g_set_error(err, LR_DOWNLOADER_ERROR, LRE_CBINTERRUPTED,
+    #   945|                               "Interrupted by LR_CB_ERROR from end callback");
+    #   946|->                     return FALSE;
+    #   947|                   }
+    #   948|               }
+
+This patch fixes it.
+
+The bug was introduced in 1.7.14 version
+(08e4810fcdd753ce4728bd88b252f7b3d34b2cdb commit).
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ librepo/downloader.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/librepo/downloader.c b/librepo/downloader.c
+index 364c0af..40dbeb2 100644
+--- a/librepo/downloader.c
++++ b/librepo/downloader.c
+@@ -943,6 +943,7 @@ select_next_target(LrDownload *dd,
+                             "from end callback", __func__);
+                     g_set_error(err, LR_DOWNLOADER_ERROR, LRE_CBINTERRUPTED,
+                             "Interrupted by LR_CB_ERROR from end callback");
++                    g_free(full_url);
+                     return FALSE;
+                 }
+             }
+@@ -953,6 +954,7 @@ select_next_target(LrDownload *dd,
+                             "Cannot download %s: Offline mode is specified "
+                             "and no local URL is available",
+                             target->target->path);
++                g_free(full_url);
+                 return FALSE;
+             }
+         }
+-- 
+2.45.2
+
