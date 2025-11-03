@@ -29,7 +29,7 @@
 
 Name:           librepo
 Version:        1.18.0
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Repodata downloading library
 
 License:        LGPL-2.1-or-later
@@ -40,6 +40,7 @@ Patch2:         0002-Fix-a-memory-leak-in-select_next_target.patch
 # https://github.com/rpm-software-management/librepo/pull/325
 Patch3:         0003-Fix-input-termination-for-pgpParsePkts.patch
 Patch4:         0004-Test-importing-keys-with-prefix-and-suffix.patch
+Patch5:         0005-Propagate-return-value-from-prepare_repo_download.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -132,6 +133,9 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Wed Sep 24 2025 Ales Matej <amatej@redhat.com> - 1.18.0-6
+- Propagate return value from prepare_repo_download_targets (RHEL-101181)
+
 * Thu Jul 03 2025 Ales Matej <amatej@redhat.com> - 1.18.0-5
 - Test for: Fix input termination for pgpParsePkts (RHEL-101176)
 
