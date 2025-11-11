@@ -14,7 +14,7 @@
 
 Name:           librepo
 Version:        1.14.5
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Repodata downloading library
 
 License:        LGPLv2+
@@ -22,6 +22,7 @@ URL:            https://github.com/rpm-software-management/librepo
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 
 Patch0001:      0001-PGP-Set-a-default-creation-SELinux-labels-on-GnuPG-d.patch
+Patch0002:      0002-Propagate-return-value-from-prepare_repo_download_ta.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -105,6 +106,9 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Tue Jun 24 2025 Ales Matej <amatej@redhat.com> - 1.14.5-3
+- Propagate return value from prepare_repo_download_targets (RHEL-85607)
+
 * Thu Oct 12 2023 Petr Pisar <ppisar@redhat.com> - 1.14.5-2
 - Set default SELinux labels on GnuPG directories (RHEL-11240)
 
