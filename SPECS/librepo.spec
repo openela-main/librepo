@@ -37,10 +37,10 @@ URL:            https://github.com/rpm-software-management/librepo
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 Patch1:         0001-Use-rpm-sequoia-on-RHEL-10.patch
 Patch2:         0002-Fix-a-memory-leak-in-select_next_target.patch
+Patch3:         0003-Propagate-return-value-from-prepare_repo_download_ta.patch
 # https://github.com/rpm-software-management/librepo/pull/325
-Patch3:         0003-Fix-input-termination-for-pgpParsePkts.patch
-Patch4:         0004-Test-importing-keys-with-prefix-and-suffix.patch
-Patch5:         0005-Propagate-return-value-from-prepare_repo_download.patch
+Patch4:         0004-Fix-input-termination-for-pgpParsePkts.patch
+Patch5:         0005-Test-importing-keys-with-prefix-and-suffix.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -133,14 +133,15 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
-* Wed Sep 24 2025 Ales Matej <amatej@redhat.com> - 1.18.0-6
-- Propagate return value from prepare_repo_download_targets (RHEL-101181)
+* Thu Jul 03 2025 Ales Matej <amatej@redhat.com> - 1.18.0-6
+- Test for: Fix input termination for pgpParsePkts (RHEL-125130)
 
-* Thu Jul 03 2025 Ales Matej <amatej@redhat.com> - 1.18.0-5
-- Test for: Fix input termination for pgpParsePkts (RHEL-101176)
+* Tue Jun 24 2025 Romain Geissler <romain.geissler@amadeus.com> - 1.18.0-5
+- Fix input termination for pgpParsePkts
+  Resolves: RHEL-82533
 
-* Tue Jun 24 2025 Romain Geissler <romain.geissler@amadeus.com> - 1.18.0-4
-- Fix input termination for pgpParsePkts (RHEL-101176)
+* Tue Jun 24 2025 Ales Matej <amatej@redhat.com> - 1.18.0-4
+- Propagate return value from prepare_repo_download_targets (RHEL-85338)
 
 * Tue Oct 29 2024 Troy Dawson <tdawson@redhat.com> - 1.18.0-3
 - Bump release for October 2024 mass rebuild:
