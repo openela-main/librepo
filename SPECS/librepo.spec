@@ -8,33 +8,54 @@
 %bcond_without zchunk
 %endif
 
-%bcond_without selinux
+%if 0%{?fedora} >= 39 || 0%{?rhel} >= 10
+%bcond_with use_gpgme
+%bcond_with use_selinux
+%else
+%bcond_without use_gpgme
+%bcond_without use_selinux
+%endif
+
+# Needs to match how gnupg2 is compiled
+%bcond_with run_gnupg_user_socket
+
+%bcond_with sanitizers
+
+%if %{with use_gpgme} && %{with use_selinux}
+%global need_selinux 1
+%else
+%global need_selinux 0
+%endif
 
 %global dnf_conflict 2.8.8
 
 Name:           librepo
-Version:        1.14.5
-Release:        3%{?dist}
+Version:        1.19.0
+Release:        1%{?dist}
 Summary:        Repodata downloading library
 
-License:        LGPLv2+
+License:        LGPL-2.1-or-later
 URL:            https://github.com/rpm-software-management/librepo
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 
-Patch0001:      0001-PGP-Set-a-default-creation-SELinux-labels-on-GnuPG-d.patch
-Patch0002:      0002-Propagate-return-value-from-prepare_repo_download_ta.patch
+Patch0001:      0001-Propagate-return-value-from-prepare_repo_download_ta.patch
+Patch0002:      0002-Test-importing-keys-with-prefix-and-suffix.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
 BuildRequires:  check-devel
 BuildRequires:  doxygen
-BuildRequires:  pkgconfig(glib-2.0) >= 2.28
+BuildRequires:  pkgconfig(glib-2.0) >= 2.66
+%if %{with use_gpgme}
 BuildRequires:  gpgme-devel
+%else
+BuildRequires:  pkgconfig(rpm) >= 4.18.0
+%endif
 BuildRequires:  libattr-devel
 BuildRequires:  libcurl-devel >= %{libcurl_version}
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(libcrypto)
-%if %{with selinux}
+%if %{need_selinux}
 BuildRequires:  pkgconfig(libselinux)
 %endif
 BuildRequires:  pkgconfig(openssl)
@@ -43,6 +64,12 @@ BuildRequires:  pkgconfig(zck) >= 0.9.11
 %endif
 Requires:       libcurl%{?_isa} >= %{libcurl_version}
 
+%if %{with sanitizers}
+BuildRequires:  libasan
+BuildRequires:  liblsan
+BuildRequires:  libubsan
+%endif
+
 %description
 A library providing C and Python (libcURL like) API to downloading repository
 metadata.
@@ -50,6 +77,9 @@ metadata.
 %package devel
 Summary:        Repodata downloading library
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+%if %{with zchunk}
+Requires:       zchunk-devel%{?_isa}
+%endif
 
 %description devel
 Development files for librepo.
@@ -75,8 +105,15 @@ Python 3 bindings for the librepo library.
 
 %build
 %cmake \
-    %{!?with_zchunk:-DWITH_ZCHUNK=OFF} \
-    -DENABLE_SELINUX=%{?with_selinux:ON}%{!?with_selinux:OFF}
+    -DWITH_ZCHUNK=%{?with_zchunk:ON}%{!?with_zchunk:OFF} \
+    -DUSE_GPGME=%{?with_use_gpgme:ON}%{!?with_use_gpgme:OFF} \
+    -DUSE_RUN_GNUPG_USER_SOCKET=%{?with_run_gnupg_user_socket:ON}%{!?with_run_gnupg_user_socket:OFF} \
+    -DWITH_SANITIZERS=%{?with_sanitizers:ON}%{!?with_sanitizers:OFF} \
+%if %{need_selinux}
+    -DENABLE_SELINUX=ON
+%else
+    -DENABLE_SELINUX=OFF
+%endif
 %cmake_build
 
 %check
@@ -106,6 +143,9 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Thu Nov 27 2025 Petr Pisar <ppisar@redhat.com> - 1.19.0-1
+- Rebase to 1.19.0 (RHEL-62033)
+
 * Tue Jun 24 2025 Ales Matej <amatej@redhat.com> - 1.14.5-3
 - Propagate return value from prepare_repo_download_targets (RHEL-85607)
 

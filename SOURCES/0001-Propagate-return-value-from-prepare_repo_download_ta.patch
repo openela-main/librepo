@@ -1,4 +1,4 @@
-From 089eac540f395db8303e42bc9716a14851b1132c Mon Sep 17 00:00:00 2001
+From 27512a789981d73158202de6a390762b2e71e4aa Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ale=C5=A1=20Mat=C4=9Bj?= <amatej@redhat.com>
 Date: Mon, 9 Jun 2025 09:25:39 +0200
 Subject: [PATCH] Propagate return value from `prepare_repo_download_targets`
@@ -27,5 +27,5 @@ index 56bca3e..482d4d9 100644
      if (!targets)
          return TRUE;
 -- 
-2.49.0
+2.52.0
 
