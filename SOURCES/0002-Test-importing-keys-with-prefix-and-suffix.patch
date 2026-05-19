@@ -1,9 +1,14 @@
-From 3db1cd8a7260f83170d247422976c8a8d4af09d9 Mon Sep 17 00:00:00 2001
+From 30dbb9976c8b6bc8dfd5e60b1344e864c201d89b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ale=C5=A1=20Mat=C4=9Bj?= <amatej@redhat.com>
 Date: Mon, 30 Jun 2025 11:23:49 +0200
 Subject: [PATCH] Test importing keys with prefix and suffix
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
 Test the fix from: 1be89319d30d2ea2a027d6bd06bb1b76bd682f87
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
 ---
  tests/test_gpg.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 46 insertions(+)
@@ -73,5 +78,5 @@ index 6642cc7..b865991 100644
      return s;
  }
 -- 
-2.50.0
+2.52.0
 

@@ -19,6 +19,8 @@
 # Needs to match how gnupg2 is compiled
 %bcond_with run_gnupg_user_socket
 
+%bcond_with sanitizers
+
 %if %{with use_gpgme} && %{with use_selinux}
 %global need_selinux 1
 %else
@@ -28,19 +30,16 @@
 %global dnf_conflict 2.8.8
 
 Name:           librepo
-Version:        1.18.0
-Release:        6%{?dist}
+Version:        1.19.0
+Release:        1%{?dist}
 Summary:        Repodata downloading library
 
 License:        LGPL-2.1-or-later
 URL:            https://github.com/rpm-software-management/librepo
 Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
-Patch1:         0001-Use-rpm-sequoia-on-RHEL-10.patch
-Patch2:         0002-Fix-a-memory-leak-in-select_next_target.patch
-Patch3:         0003-Propagate-return-value-from-prepare_repo_download_ta.patch
+Patch1:         0001-Propagate-return-value-from-prepare_repo_download_ta.patch
 # https://github.com/rpm-software-management/librepo/pull/325
-Patch4:         0004-Fix-input-termination-for-pgpParsePkts.patch
-Patch5:         0005-Test-importing-keys-with-prefix-and-suffix.patch
+Patch2:         0002-Test-importing-keys-with-prefix-and-suffix.patch
 
 BuildRequires:  cmake
 BuildRequires:  gcc
@@ -64,6 +63,12 @@ BuildRequires:  pkgconfig(openssl)
 BuildRequires:  pkgconfig(zck) >= 0.9.11
 %endif
 Requires:       libcurl%{?_isa} >= %{libcurl_version}
+
+%if %{with sanitizers}
+BuildRequires:  libasan
+BuildRequires:  liblsan
+BuildRequires:  libubsan
+%endif
 
 %description
 A library providing C and Python (libcURL like) API to downloading repository
@@ -103,7 +108,12 @@ Python 3 bindings for the librepo library.
     -DWITH_ZCHUNK=%{?with_zchunk:ON}%{!?with_zchunk:OFF} \
     -DUSE_GPGME=%{?with_use_gpgme:ON}%{!?with_use_gpgme:OFF} \
     -DUSE_RUN_GNUPG_USER_SOCKET=%{?with_run_gnupg_user_socket:ON}%{!?with_run_gnupg_user_socket:OFF} \
-    -DENABLE_SELINUX=%{?need_selinux:ON}%{!?need_selinux:OFF}
+    -DWITH_SANITIZERS=%{?with_sanitizers:ON}%{!?with_sanitizers:OFF} \
+%if %{need_selinux}
+    -DENABLE_SELINUX=ON
+%else
+    -DENABLE_SELINUX=OFF
+%endif
 %cmake_build
 
 %check
@@ -133,8 +143,11 @@ Python 3 bindings for the librepo library.
 %{python3_sitearch}/%{name}/
 
 %changelog
+* Tue Nov 25 2025 Petr Pisar <ppisar@redhat.com> - 1.19.0-1
+- Rebase to 1.19.0 (RHEL-126292)
+
 * Thu Jul 03 2025 Ales Matej <amatej@redhat.com> - 1.18.0-6
-- Test for: Fix input termination for pgpParsePkts (RHEL-125130)
+- Test for: Fix input termination for pgpParsePkts (RHEL-61730)
 
 * Tue Jun 24 2025 Romain Geissler <romain.geissler@amadeus.com> - 1.18.0-5
 - Fix input termination for pgpParsePkts

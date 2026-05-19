@@ -1,9 +1,14 @@
-From 089eac540f395db8303e42bc9716a14851b1132c Mon Sep 17 00:00:00 2001
+From 65b7fe41f6a367e8f2c91f377721896512308c72 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Ale=C5=A1=20Mat=C4=9Bj?= <amatej@redhat.com>
 Date: Mon, 9 Jun 2025 09:25:39 +0200
 Subject: [PATCH] Propagate return value from `prepare_repo_download_targets`
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
 It also ensures that when return value is false there is some error set.
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
 ---
  librepo/yum.c | 7 ++++++-
  1 file changed, 6 insertions(+), 1 deletion(-)
@@ -27,5 +32,5 @@ index 56bca3e..482d4d9 100644
      if (!targets)
          return TRUE;
 -- 
-2.49.0
+2.52.0
 
